@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --matrix-green: #00ff88;
+    --matrix-green-dim: rgba(0, 255, 136, 0.2);
+    --matrix-cyan: #00e5ff;
+    --matrix-dark: #050f0c;
+    --matrix-darker: #020605;
+    
+    --background: 160 50% 2%;
+    --foreground: 160 100% 85%;
+
+    --card: 160 50% 4%;
+    --card-foreground: 160 100% 85%;
+
+    --popover: 160 50% 4%;
+    --popover-foreground: 160 100% 85%;
+
+    --primary: 152 100% 50%;
+    --primary-foreground: 160 50% 4%;
+
+    --secondary: 160 50% 10%;
+    --secondary-foreground: 152 100% 50%;
+
+    --muted: 160 50% 10%;
+    --muted-foreground: 160 30% 60%;
+
+    --accent: 160 50% 15%;
+    --accent-foreground: 152 100% 50%;
+
+    --destructive: 0 100% 40%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 152 100% 50%;
+    --input: 160 50% 10%;
+    --ring: 152 100% 50%;
+
+    --radius: 0.25rem;
+  }
+}
+
+body {
+  background-color: var(--matrix-darker);
+  color: var(--matrix-green);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Glassmorphism Classes for Matrix UI */
+.glass-panel {
+  background: rgba(5, 15, 12, 0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(0, 255, 136, 0.18);
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.05), inset 0 0 10px rgba(0, 255, 136, 0.02);
+  border-radius: var(--radius);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(10, 25, 20, 0.85);
+  border: 1px solid rgba(0, 255, 136, 0.4);
+  box-shadow: 0 0 30px rgba(0, 255, 136, 0.15), inset 0 0 15px rgba(0, 255, 136, 0.05);
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+}
+
+/* Custom Cyber Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
+  border-left: 1px solid rgba(0, 255, 136, 0.1);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 136, 0.2);
+  border-radius: 0px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 136, 0.5);
+}
+
+/* Scanline Effect */
+.scanline {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+  background-size: 100% 4px;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Vignette Overlay */
+.vignette {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  box-shadow: inset 0 0 150px rgba(0,0,0,0.9);
+  z-index: 9998;
+  pointer-events: none;
+}
+
+/* Animations */
+@keyframes matrixGlow {
+  0% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.6); }
+  100% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.2); }
+}
+.animate-matrix-glow {
+  animation: matrixGlow 2s infinite ease-in-out;
+}
+
+@keyframes pulseBorder {
+  0% { border-color: rgba(0, 255, 136, 0.2); }
+  50% { border-color: rgba(0, 255, 136, 0.8); }
+  100% { border-color: rgba(0, 255, 136, 0.2); }
+}
+.animate-pulse-border {
+  animation: pulseBorder 3s infinite ease-in-out;
+}
+
+@keyframes blinkCursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.animate-blink {
+  animation: blinkCursor 1s step-end infinite;
+}
+
+@keyframes floatCard {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.animate-float {
+  animation: floatCard 4s infinite ease-in-out;
+}
+
+/* Reduced Motion Override */
+@media (prefers-reduced-motion: reduce) {
+  .animate-matrix-glow,
+  .animate-pulse-border,
+  .animate-float,
+  .glass-panel-hover:hover {
+    animation: none;
+    transform: none;
+    transition: none;
+  }
+}
+
