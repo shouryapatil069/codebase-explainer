@@ -330,10 +330,69 @@ function explainReact(code: string): ReactExplanation {
 function explainJavaScript(code: string): JavascriptExplanation {
   const patterns: DetectedPattern[] = [];
   
+  // 1. Detect structures
   const functionDefs = Array.from(code.matchAll(/(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>)/g)).map(m => m[1] || m[2]);
   const classDefs = Array.from(code.matchAll(/class\s+(\w+)/g)).map(m => m[1]);
+  const varMatch = Array.from(code.matchAll(/(?:const|let|var)\s+(\w+)\s*=/g)).map(m => m[1]);
+  const vars = Array.from(new Set(varMatch)).filter(v => !functionDefs.includes(v));
+
+  const hasAsync = code.includes("async ") || code.includes("await ");
+  const hasPromise = code.includes("Promise") || code.includes(".then(");
+  const hasFetch = code.includes("fetch(");
+  const hasDOM = code.includes("document.querySelector") || code.includes("document.getElementById") || code.includes("document.createElement");
+  const hasEvents = code.includes("addEventListener");
+  const hasStorage = code.includes("localStorage") || code.includes("sessionStorage");
+  const hasLoops = code.match(/\b(for|while|forEach)\b/);
+  const hasArrayMethods = code.match(/\.(map|filter|reduce|find)\b/);
+  const hasObjects = code.includes("{") && code.includes(":");
+  const hasArrays = code.includes("[") && code.includes("]");
+  const hasConsole = code.includes("console.log");
+
+  // Populate patterns (Main JavaScript Features Used)
+  if (functionDefs.length > 0) patterns.push({ name: "Functions", description: "Reusable logic blocks." });
+  if (classDefs.length > 0) patterns.push({ name: "Classes", description: "Object-oriented blueprints." });
+  if (vars.length > 0) patterns.push({ name: "Variables", description: "Stores data references." });
+  if (hasAsync || hasPromise) patterns.push({ name: "Asynchronous Logic", description: "Handles async operations." });
+  if (hasFetch) patterns.push({ name: "API Calls", description: "Network requests via fetch." });
+  if (hasDOM) patterns.push({ name: "DOM Manipulation", description: "Selects HTML elements." });
+  if (hasEvents) patterns.push({ name: "Event Listeners", description: "Listens for user interactions." });
+  if (hasStorage) patterns.push({ name: "Web Storage", description: "Browser persistence." });
+  if (hasLoops) patterns.push({ name: "Loops", description: "Iterates over data." });
+  if (hasArrayMethods) patterns.push({ name: "Array Methods", description: "Transforms and filters data." });
+
+  // Overviews
+  let summary = `This JavaScript code defines dynamic logic and processes data.`;
+  if (hasDOM && hasEvents) summary = `This JavaScript code creates an interactive frontend by manipulating the DOM and handling user events.`;
+  else if (hasFetch) summary = `This JavaScript code communicates with an external API to fetch and process data.`;
+  else if (classDefs.length > 0) summary = `This JavaScript code uses Object-Oriented Programming (OOP) to define classes and methods.`;
   
-  // Extract class methods accurately
+  let purpose = `The main purpose is to execute instructions and manage data flow dynamically.`;
+
+  // Important Parts (Main JavaScript Features Used)
+  let parts = "";
+  if (vars.length > 0) parts += `- **Variables**: Uses ${vars.length > 5 ? 'multiple variables' : vars.slice(0, 5).join(', ')} to store state.\n`;
+  if (hasArrays) parts += `- **Arrays**: Uses arrays to manage lists of data.\n`;
+  if (hasObjects) parts += `- **Objects**: Uses objects to group related properties.\n`;
+  if (hasLoops) parts += `- **Loops**: Uses loops (for, while, or forEach) to repeat actions.\n`;
+  if (hasArrayMethods) parts += `- **Array Methods**: Uses functional methods like map, filter, or reduce to process lists.\n`;
+  if (hasFetch) parts += `- **Fetch/API**: Connects to an external server to send or receive data.\n`;
+  if (hasAsync) parts += `- **Async/Await**: Waits for asynchronous operations to complete without blocking the code.\n`;
+  if (hasPromise) parts += `- **Promises**: Handles future results of asynchronous tasks.\n`;
+  if (hasDOM) parts += `- **DOM Selectors**: Finds elements on the web page using DOM methods.\n`;
+  if (hasEvents) parts += `- **Event Listeners**: Reacts to user actions like clicks or keyboard inputs.\n`;
+  if (hasStorage) parts += `- **Storage**: Saves data locally in the browser so it persists after a refresh.\n`;
+  if (hasConsole) parts += `- **Console Output**: Prints information to the developer console for debugging or results.\n`;
+  if (!parts) parts = "- Code executes basic instructions sequentially.\n";
+
+  // Code Flow
+  let flow = "1. Code execution begins.\n2. Variables and functions are defined.\n3. Processing logic is executed.\n4. Output is generated.";
+  if (hasDOM && hasEvents) {
+    flow = "1. HTML elements are selected from the DOM.\n2. Event listeners are attached to elements.\n3. When an event occurs, callback functions execute.\n4. The DOM or internal state is updated.";
+  } else if (hasFetch && hasAsync) {
+    flow = "1. Variables and async functions are initialized.\n2. An asynchronous API request is triggered.\n3. Code waits for the response.\n4. Data is parsed and processed.\n5. Results are used or displayed.";
+  }
+
+  // Class Breakdown
   const classBreakdownArr: string[] = [];
   if (classDefs.length > 0) {
     const methodRegex = /^\s*(async\s+)?([a-zA-Z0-9_]+)\s*\([^)]*\)\s*\{/gm;
@@ -341,178 +400,44 @@ function explainJavaScript(code: string): JavascriptExplanation {
     while ((mMatch = methodRegex.exec(code)) !== null) {
       const isAsync = mMatch[1] ? "async " : "";
       const methodName = mMatch[2];
-      
-      const startIdx = mMatch.index;
-      const endIdx = code.indexOf('}', startIdx);
-      const body = code.substring(startIdx, endIdx !== -1 ? endIdx : code.length);
-
-      if (methodName !== "function" && methodName !== "if" && methodName !== "for" && methodName !== "switch" && methodName !== "while" && methodName !== "catch") {
-        let desc = `**${methodName}()**: `;
-        
-        if (methodName === "constructor") {
-          if (body.includes("storageKey")) desc += "stores storageKey and ";
-          if (body.includes("localStorage.getItem") || body.includes("loadProducts")) desc += "loads saved products. ";
-          else desc += "initializes the class. ";
-        } else {
-          if (body.includes("push(")) desc += "creates an object, pushes it into an array, ";
-          if (body.includes("find(")) desc += "finds an item, ";
-          if (body.includes("stock")) desc += "updates stock, ";
-          if (body.includes("saveProducts") || body.includes("localStorage.setItem")) desc += "saves changes, ";
-          if (body.includes("console.log") || body.includes("console.error")) desc += "and logs the result. ";
-          if (body.includes(".filter(")) desc += "filters items based on conditions. ";
-          if (body.includes(".reduce(")) desc += "uses reduce to calculate totals. ";
-          if (body.includes(".includes(") && body.includes("toLowerCase")) desc += "filters items by name using includes and toLowerCase. ";
-          if (body.includes("JSON.stringify")) desc += "saves data to localStorage using JSON.stringify. ";
-          if (body.includes("JSON.parse") && body.includes("try") && body.includes("catch")) desc += "reads data from localStorage and parses them using JSON.parse with try/catch protection. ";
-          
-          if (desc === `**${methodName}()**: `) desc += `${isAsync}method inside a class.`;
-        }
-        
-        // Clean up trailing commas/ands
-        desc = desc.replace(/,\s*and logs/, " and logs").replace(/,\s*$/, ".");
-        
-        classBreakdownArr.push(`- ${desc.trim()}`);
-      }
+      if (["function", "if", "for", "switch", "while", "catch"].includes(methodName)) continue;
+      classBreakdownArr.push(`- **${methodName}()**: ${isAsync}method defined inside a class.`);
     }
   }
+  let classBreakdown = classDefs.length > 0 ? classDefs.map(c => `- **${c}**: Class definition.`).join('\n') + (classBreakdownArr.length ? '\n' + classBreakdownArr.join('\n') : '') : undefined;
 
-  let vars = Array.from(code.matchAll(/(?:const|let|var)\s+(\w+)\s*=/g)).map(m => m[1]).filter(v => !functionDefs.includes(v));
-
-  if (vars.length > 0) patterns.push({ name: "Variables", description: "Stores data references." });
-  if (classDefs.length > 0) patterns.push({ name: "Classes", description: "Object-oriented blueprints." });
-  if (functionDefs.length > 0) patterns.push({ name: "Functions", description: "Reusable logic." });
-  if (code.includes("localStorage")) patterns.push({ name: "LocalStorage", description: "Browser persistence." });
-  if (code.includes("fetch(")) patterns.push({ name: "Fetch API", description: "Network requests." });
-
-  let summary = `This JavaScript code defines logic using variables and functions.`;
-  let purpose = `The purpose is to process data and execute operations.`;
-  
-  const lowerCode = code.toLowerCase();
-  const isCart = lowerCode.includes("cart") && lowerCode.includes("product");
-  const isTodo = lowerCode.includes("task") || lowerCode.includes("todo");
-  const isLibrary = lowerCode.includes("book") && lowerCode.includes("issue");
-  const isWeather = lowerCode.includes("weather") && code.includes("fetch");
-  const isExpense = lowerCode.includes("expense") || lowerCode.includes("amount");
-  const isAttendance = lowerCode.includes("attendance") && lowerCode.includes("student");
-
-  if (isCart) {
-    summary = "This JavaScript code manages a shopping cart system. It handles products, quantities, and cart calculations.";
-    purpose = "The purpose is to simulate a store workflow where items can be added, removed, and totals calculated.";
-  } else if (isTodo) {
-    summary = "This JavaScript code manages a todo/task list. It can handle adding, removing, and toggling tasks.";
-    purpose = "The purpose is to store and manage tasks, tracking their completion status.";
-  } else if (isLibrary) {
-    summary = "This JavaScript code manages a library system handling books, issuing, and returning.";
-    purpose = "The purpose is to track book inventory and member borrowing records.";
-  } else if (isWeather) {
-    summary = "This JavaScript code fetches and processes weather API data.";
-    purpose = "The purpose is to retrieve weather reports from an external service and format the results.";
-  } else if (isExpense) {
-    summary = "This JavaScript code calculates and manages financial expenses.";
-    purpose = "The purpose is to track spending and calculate total or highest expense categories.";
-  } else if (isAttendance) {
-    summary = "This JavaScript code manages student attendance records. It calculates attendance percentages, assigns attendance status labels, creates a report for every student, filters students with short attendance, and prints the results.";
-    purpose = "The purpose is to convert raw attendance data into a clear attendance report showing each student's roll number, attendance percentage, and status.";
-  }
-
-  let parts = "";
-  if (isAttendance) {
-    parts += `- **attendanceRecords**: array of student objects with name, rollNo, presentDays, totalDays.\n`;
-    parts += `- **calculateAttendancePercentage**: function to calculate percentages.\n`;
-    parts += `- **getAttendanceStatus**: function for condition checks.\n`;
-    parts += `- **generateAttendanceReport**: function to map data.\n`;
-    parts += `- **map()** and **filter()**: array transformations.\n`;
-    parts += `- **toFixed()**: formats decimal numbers.\n`;
-    parts += `- **conditionals**: status branching logic.\n`;
-    parts += `- **console.log**: outputs result outside functions.\n`;
-  } else {
-    if (classDefs.length > 0) parts += `- **Classes**: ${classDefs.join(', ')}\n`;
-    if (functionDefs.length > 0) parts += `- **Functions**: ${functionDefs.slice(0,10).join(', ')}\n`;
-    if (vars.length > 0) parts += `- **Variables**: ${Array.from(new Set(vars)).slice(0,10).join(', ')}\n`;
-    if (code.includes(".filter(")) parts += `- **filter()**: Used to filter array data.\n`;
-    if (code.includes(".reduce(")) parts += `- **reduce()**: Used to calculate totals or combine data.\n`;
-    if (code.includes(".map(")) parts += `- **map()**: Used to transform array data.\n`;
-    if (code.includes("localStorage.setItem")) parts += `- **localStorage**: Saves data persistently.\n`;
-  }
-
-  let flow = "1. Code initializes variables/classes.\n2. Functions are invoked to process data.\n3. Output is returned or logged.";
-  if (isAttendance) {
-    flow = "1. Creates attendanceRecords with student attendance data.\n2. calculateAttendancePercentage divides presentDays by totalDays and multiplies by 100.\n3. getAttendanceStatus checks the percentage and returns Excellent, Good, Warning, or Short Attendance.\n4. generateAttendanceReport uses map to create a new report array.\n5. Each report object includes name, rollNo, percentage, and status.\n6. shortAttendanceStudents uses filter to keep only students with Short Attendance.\n7. console.log prints the full report and short attendance list.";
-  }
-
+  // Function Breakdown
   let funcBreakdownArr: string[] = [];
   const funcBlockRegex = /(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>)/g;
   let fMatch;
   while ((fMatch = funcBlockRegex.exec(code)) !== null) {
     const name = fMatch[1] || fMatch[2];
-    const startIdx = fMatch.index;
-    const endIdx = code.indexOf('}', startIdx);
-    const body = code.substring(startIdx, endIdx !== -1 ? endIdx : code.length);
-    
-    let desc = "";
-    const lowerName = name.toLowerCase();
-
-    // Heuristics based on naming and operations
-    if (lowerName.includes("calculate") && (body.includes("/") || body.includes("*"))) {
-      const usesPresent = body.includes("presentDays") ? "presentDays and totalDays" : "input values";
-      desc += `calculates ${name.replace(/calculate/i, '').replace(/([A-Z])/g, ' $1').toLowerCase().trim() || 'a value'} using ${usesPresent}. `;
-    } else if ((lowerName.includes("status") || lowerName.includes("grade")) && body.includes("if")) {
-      const varName = lowerName.includes("status") ? "percentage" : "value";
-      desc += `uses conditional checks to convert a ${varName} into a status label. `;
-    } else if (lowerName.includes("generate") && body.includes(".map(")) {
-      desc += `uses map to transform raw data into report objects. `;
-    } else {
-      if (body.includes("fetch(")) desc += "fetches data from an API. ";
-      if (body.includes("response.ok")) desc += "checks if API request was successful. ";
-      if (body.includes("response.json")) desc += "converts response to JSON. ";
-      if (body.includes("localStorage.setItem")) desc += "saves data to localStorage. ";
-      if (body.includes("localStorage.getItem")) desc += "loads data from localStorage. ";
-      if (body.includes("JSON.stringify")) desc += "converts data to string for storage. ";
-      if (body.includes("JSON.parse")) desc += "converts saved string back to data. ";
-      if (body.includes(".map(")) desc += "transforms or updates array items. ";
-      if (body.includes(".filter(")) desc += "selects or removes items. ";
-      if (body.includes(".reduce(") && body.includes("+")) desc += "calculates total sum. ";
-      else if (body.includes(".reduce(")) desc += "calculates total or compares items. ";
-      if (body.includes(".find(")) desc += "searches for one matching item. ";
-      if (body.includes(".some(")) desc += "checks if an item exists. ";
-      if (body.includes("console.log")) desc += "prints output. ";
-      if (!desc) desc = "executes processing logic.";
-    }
-    
-    funcBreakdownArr.push(`- **${name}()**: ${desc.trim()}`);
+    const isArrow = code.substring(fMatch.index, fMatch.index + 50).includes("=>") ? "Arrow function" : "Function";
+    funcBreakdownArr.push(`- **${name}()**: ${isArrow} that encapsulates specific logic.`);
   }
 
-  let dFlow = "Data Variables → Processing Functions → Return / Log";
-  if (isAttendance) {
-    dFlow = "attendanceRecords → generateAttendanceReport → calculateAttendancePercentage → getAttendanceStatus → attendanceReport\nattendanceReport → filter → shortAttendanceStudents\nattendanceReport + shortAttendanceStudents → console.log";
-  }
+  // Data Handling
+  let dFlow = "Data is assigned to variables, passed into functions as arguments, and returned as results.";
+  if (hasFetch) dFlow += "\nData is exchanged with external servers via API requests.";
+  if (hasStorage) dFlow += "\nData is persisted in the browser's storage.";
+  if (hasDOM) dFlow += "\nData is read from or written to HTML elements.";
+
+  let beginner = "Think of this code like a recipe. The variables are your ingredients, the functions are the cooking steps, and the code runs from top to bottom to create the final dish.";
   
-  let beginner = "Think of this script like a data processing pipeline. It takes raw information, uses functions (like workers) to sort and calculate it, and outputs the result.";
-  if (isCart) beginner = "Think of this like a shopping basket. You put items in, remove them, and a calculator figures out your total bill.";
-  if (isTodo) beginner = "Think of this like a notebook. You write tasks down, cross them off, and save the notebook for later.";
-  if (isAttendance) beginner = "Think of this like a teacher making an attendance sheet. The attendanceRecords array stores each student's attendance. calculateAttendancePercentage finds the percentage. getAttendanceStatus decides the label. generateAttendanceReport creates the final report, and filter separates students with short attendance.";
-
   let improvements = "";
-  if (code.includes("/")) improvements += "- Validate that totalDays is not zero.\n";
-  if (code.includes("toFixed(")) improvements += "- Convert percentage to a number after toFixed if calculations are needed later.\n";
-  if (isAttendance) improvements += "- Add sorting by attendance percentage.\n";
-  if (code.includes("console.log") && lowerCode.includes("report")) improvements += "- Display the report in an HTML table instead of console.log.\n";
-  if (code.includes("if") && code.includes("return") && (code.includes("Warning") || code.includes("Short"))) improvements += "- Move status limits into constants for easier changes.\n";
-  if (!improvements) {
-    improvements = "- Add input validation and error handling.\n- Format output for better readability.\n";
-    if (code.includes("fetch(")) improvements += "- Add error handling for failed API requests using try/catch.\n";
-  }
-
-  let classBreakdown = classDefs.length > 0 ? classDefs.map(c => `- **${c}**: Class definition.\n` + classBreakdownArr.join('\n')).join('\n') : undefined;
+  if (!code.includes("try") && !code.includes("catch") && (hasFetch || hasAsync || hasPromise)) improvements += "- Add try/catch blocks to handle potential network or async errors safely.\n";
+  if (varMatch.length > 0 && code.includes("var ")) improvements += "- Use 'const' and 'let' instead of 'var' for safer variable scoping.\n";
+  if (functionDefs.length === 0 && code.length > 200) improvements += "- Break down the code into smaller, reusable functions.\n";
+  if (!improvements) improvements = "- Add input validation and error handling.\n- Add comments explaining complex logic.\n";
 
   return {
     mode: 'javascript',
     simpleSummary: summary,
     mainPurpose: purpose,
-    importantParts: parts,
+    importantParts: parts.trim(),
     stepByStepFlow: flow,
     classBreakdown: classBreakdown,
-    functionBreakdown: funcBreakdownArr.length > 0 ? funcBreakdownArr.join('\n') : "No distinct functions detected.",
+    functionBreakdown: funcBreakdownArr.length > 0 ? funcBreakdownArr.join('\n') : "No named functions detected.",
     dataFlow: dFlow,
     patterns: patterns,
     beginnerExplanation: beginner,
